@@ -5,7 +5,10 @@ from jaraco.nxt.messages import SetOutputState, RunState
 from jaraco.nxt import _enum as enum
 from jaraco.nxt.routine import *
 import time
-#import jaraco.nxt
+
+
+version = "0.0.1"
+
 
 def run():
 	"""runs the bot"""
@@ -115,6 +118,7 @@ def run():
 	except KeyboardInterrupt:
 		sys.stdout.write('\n')
 
+
 def query_status(dev, port):
 	"""
 	Send the GetInputValues message, then process the
@@ -133,6 +137,7 @@ def query_status(dev, port):
 	#sys.stdout.write('\r')
 	#sys.stdout.write(values)
 	return values
+
 
 def turn_left(conn):
 
@@ -154,6 +159,7 @@ def turn_left(conn):
 	cmd = SetOutputState(port_c)
 	conn.send(cmd)
 
+
 def turn_right(conn):
 
 	"""Turn the motor one direction, then the other, then stop it"""
@@ -174,6 +180,7 @@ def turn_right(conn):
 	cmd = SetOutputState(port_c)
 	conn.send(cmd)
 
+
 def forward(conn):
 	"""turns both motors, theoretically sending th bot forward"""
 
@@ -190,6 +197,7 @@ def forward(conn):
 	conn.send(cmd)
 	cmd = SetOutputState(port_c)
 	conn.send(cmd)
+
 
 def back_it_up(conn):
 	"""reverses the bot, apparantly overshot the line"""
@@ -209,8 +217,6 @@ def back_it_up(conn):
 	conn.send(cmd)
 
 
-
-
 def brake(conn):
 	"""brakes both motors"""
 
@@ -222,6 +228,7 @@ def brake(conn):
 
 	conn.send(cmd_b)
 	conn.send(cmd_c)
+
 
 def calibrate(conn, color, port):
 	print "place on " + str(color)
