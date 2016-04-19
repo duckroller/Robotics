@@ -1,0 +1,212 @@
+// File: Wall_follower.nxc
+// Date: 4/18/2016
+// Desc: Follow a wall
+// Global variables (for file writing)
+
+unsigned int result; // flag returned when handling files
+byte fileHandle; // handle to the data file
+short bytesWritten; // number of bytes written to the file
+string fileHeader; // column header for data in the file
+int fileNumber, filePart; // integers to split up data file names
+string fileName; // name of the file
+string strFileNumber; // file number e.g myDataFile 1, 2, 3
+string strFilePart; // file part e.g. myDataFile1-1, 1-2, 1-3
+string text; // string to be written to file i.e. data values
+string write;
+int calibrated_distance;
+int running_us_avg = 20;
+
+
+#define MOTOR OUT_B
+#define FULL_SPEED 100
+#define DEG_TO_RPM 166.6667 // converts degrees per millisecond to RPM
+long prev_tick;
+long prev_deg = 0;
+long cur_tick;
+
+string rpm_msg()
+{
+   long dt = CurrentTick() - prev_tick;
+   long deg = MotorRotationCount(MOTOR) - prev_deg;
+   float rpm = deg * DEG_TO_RPM / dt;
+   prev_deg = MotorRotationCount(MOTOR);
+   prev_tick = CurrentTick();
+   return NumToStr(rpm);
+}
+
+// Create and initialize a file
+void InitWriteToFile() {
+  fileNumber = 0;  // set first data file to be zero
+  filePart = 0; // set first part of first data file to zero
+  fileName = "sensor_data.csv" ; // name of data file
+  result=CreateFile(fileName, 1024, fileHandle);
+  // NXT Guide Section 9.100 pg. 1812 and Section 6.59.2.2 pg. 535
+  // returns file handle (unsigned int)
+  // check if the file already exists
+  while (result==LDR_FILEEXISTS) // LDR_FILEEXISTS returns if file pre-exists
+     {
+      CloseFile(fileHandle);
+      fileNumber = fileNumber + 1; // create new file if already exists
+      fileName=NumToStr(fileNumber);
+      fileName=StrCat("sensor_data" , fileName, ".csv");
+      result=CreateFile(fileName, 1024, fileHandle);
+      }
+  // play a tone every time a file is created
+  PlayTone(TONE_B7, 5);
+  fileHeader = "Current Tick, RPM, Orientation" ; // header for myData file
+  WriteLnString(fileHandle, fileHeader, bytesWritten);
+  // NXT Guide Section 6.59.2.43 pg. 554
+  // Write string and new line to a file
+  // bytesWritten is an unsigned int.  Its value is # of bytes written
+} // end InitWriteToFile
+
+void WriteToFile(string strTempText) {
+  // strTempText stores the text (i.e. ticks and motorRpm to be written to file
+  // write string to file
+  result=WriteLnString(fileHandle, strTempText, bytesWritten);
+  // if the end of file is reached, close the file and create a new part
+  if (result==LDR_EOFEXPECTED) // LDR_EOFEXPECTED is flagged when end-of-file
+    { // close the current file
+      CloseFile(fileHandle); // NXT Guide Section 6.59.2.1 pg. 535
+    // Closes file associated with file handle
+    // create the next file name
+    filePart = filePart + 1;
+    strFileNumber = NumToStr(fileNumber);
+    strFilePart = NumToStr(filePart);
+    fileName = StrCat("sensor_data" , strFileNumber,"-", strFilePart ,".csv");
+    // delete the file if it exists
+    DeleteFile(fileName); // NXT Guide Section 6.59.2.5 pg. 537
+    // Delete the file specified by the string input
+    // create a new file
+    CreateFile(fileName, 1024, fileHandle);
+    // play a tone every time a file is created
+    PlayTone(TONE_B7, 5);
+    WriteLnString(fileHandle, strTempText, bytesWritten);
+    } // end if
+} // end WriteToFile
+
+// Close the file
+void StopWriteToFile() {
+  // close the file
+  CloseFile(fileHandle);
+} // end StopWriteToFile
+
+
+
+
+int aggregate_compass_sense () { //Figure out which sort of variable IN_2 is so we can ask for it here
+    SetSensorLowspeed(IN_2);
+    int compass_read;
+    for (int x = 1; x <= 5; x++){
+        compass_read += SensorHTCompass(IN_2);
+        Wait(400);
+    }
+    compass_read = compass_read/5;
+    return compass_read;
+}
+
+
+int aggregate_ultrasonic_sense () { //Figure out which sort of variable IN_1 is so we can ask for it here
+    SetSensorLowspeed(IN_1);
+    int us_read;
+    for (int x = 1; x <= 5; x++){
+        us_read += SensorUS(IN_1);
+        Wait(100);
+    }
+    us_read = us_read/5;
+    return us_read;
+}
+
+task running_us_avg_task (){
+  SetSensorLowspeed(IN_1);
+
+
+  while (true) {
+    int avg;
+      for (int x = 1; x <=8; x++){
+        avg += SensorUS(IN_1);
+      }
+      avg = avg/8;
+      running_us_avg = avg;
+    }
+  }
+
+
+task sense_drive_and_write () {
+     SetSensorLowspeed(IN_1);
+     byte motors[] = {OUT_B,OUT_C};
+     long initial_tick = CurrentTick();
+     InitWriteToFile();
+
+     int us_val = running_us_avg; //aggregate_ultrasonic_sense();
+
+     while (us_val < calibrated_distance + 20) { //While loop to turn towards wall if it drifts away, and away from wall if it drifts close
+
+         if (us_val < 20 + 5)
+         {
+          OnFwdSync(motors, 60, -1);
+         } else if (us_val > (calibrated_distance - 5))
+         {
+          OnFwdSync(motors, 60, 1);
+         } else
+         { OnFwd(motors, 60);}
+
+         us_val = running_us_avg; //aggregate_ultrasonic_sense();
+
+         string rpm_val = rpm_msg();
+
+         int compass_read = aggregate_compass_sense();
+
+         string compass_val = NumToStr(compass_read);
+
+         cur_tick = CurrentTick() - initial_tick;
+
+         string tick_val = NumToStr(cur_tick);
+         // Concatenate the 2 strings into a single one.
+         // Write resulting string to file. The text will end with a EOL
+         text = StrCat(compass_val, "," , rpm_val, "," , tick_val, "," );
+         WriteToFile(text);
+         TextOut(0, LCD_LINE1, "US Reading:");
+         ClearLine(LCD_LINE2);
+         NumOut(0,LCD_LINE2, us_val);
+         TextOut(0,LCD_LINE3, "Compass Bearing:");
+         ClearLine(LCD_LINE4);
+         NumOut(0,LCD_LINE4, compass_val);
+         TextOut(0,LCD_LINE5, "Ticks since start:");
+         ClearLine(LCD_LINE6);
+         TextOut(0,LCD_LINE6, tick_val);
+     }
+
+     Off(motors);
+     StopWriteToFile();
+     StopAllTasks();
+}
+
+task calibrate_ultrasonic_sensor() {
+  SetSensorLowspeed(IN_1);
+  TextOut(0, LCD_LINE2, "  Press  Center");
+  TextOut(0, LCD_LINE3, "    Button To");
+  TextOut(0, LCD_LINE4, "    Calibrate");
+
+  until(ButtonPressed(BTNCENTER, true)) {Wait(10);}
+
+  calibrated_distance = aggregate_ultrasonic_sense();
+  running_us_avg = calibrated_distance;
+  ClearScreen();
+  TextOut(0, LCD_LINE2, "Calibrated value: ");
+  NumOut(0, LCD_LINE3,calibrated_distance);
+  TextOut(0, LCD_LINE6,"Press Center");
+  TextOut(0, LCD_LINE7,"Button To Run");
+
+  until(ButtonPressed(BTNCENTER, true)) {Wait(10);}
+
+  ClearScreen();
+  Precedes(sense_drive_and_write);
+
+}
+
+task main ()
+{
+  Precedes(calibrate_ultrasonic_sensor,running_us_avg_task);
+
+} // end of main
