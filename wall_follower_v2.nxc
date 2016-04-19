@@ -53,7 +53,7 @@ void InitWriteToFile() {
       }
   // play a tone every time a file is created
   PlayTone(TONE_B7, 5);
-  fileHeader = "Current Tick, RPM, Orientation" ; // header for myData file
+  fileHeader = "Orientation, RPM, Current Tick" ; // header for myData file
   WriteLnString(fileHandle, fileHeader, bytesWritten);
   // NXT Guide Section 6.59.2.43 pg. 554
   // Write string and new line to a file
