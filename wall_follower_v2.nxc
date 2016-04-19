@@ -99,7 +99,6 @@ int aggregate_compass_sense () { //Figure out which sort of variable IN_2 is so 
     int compass_read;
     for (int x = 1; x <= 5; x++){
         compass_read += SensorHTCompass(IN_2);
-        Wait(400);
     }
     compass_read = compass_read/5;
     return compass_read;
@@ -142,12 +141,12 @@ task sense_drive_and_write () {
 
      while (us_val < calibrated_distance + 20) { //While loop to turn towards wall if it drifts away, and away from wall if it drifts close
 
-         if (us_val < 20 + 5)
+         if (us_val < calibrated_distance + 5)
          {
-          OnFwdSync(motors, 60, -1);
+          OnFwdSync(motors, 60, 2);
          } else if (us_val > (calibrated_distance - 5))
          {
-          OnFwdSync(motors, 60, 1);
+          OnFwdSync(motors, 60, -2);
          } else
          { OnFwd(motors, 60);}
 
@@ -171,10 +170,11 @@ task sense_drive_and_write () {
          NumOut(0,LCD_LINE2, us_val);
          TextOut(0,LCD_LINE3, "Compass Bearing:");
          ClearLine(LCD_LINE4);
-         NumOut(0,LCD_LINE4, compass_val);
+         TextOut(0,LCD_LINE4, compass_val);
          TextOut(0,LCD_LINE5, "Ticks since start:");
          ClearLine(LCD_LINE6);
          TextOut(0,LCD_LINE6, tick_val);
+         Wait(2000);
      }
 
      Off(motors);
