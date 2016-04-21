@@ -96,17 +96,17 @@ void StopWriteToFile() {
 
 // this function receieves compass_calibrate and returns the value by which the current
 // heading of robot is off by. compass_calibrate is the initial reading of the compass
-int error_detector (int compass_calibrate) { //Figure out which sort of variable IN_2 is so we can ask for it here 
+int error_detector (int calibrated_compass_value) { //Figure out which sort of variable IN_2 is so we can ask for it here
     SetSensorLowspeed(IN_2);   // Not sure what this is doing , so I left it in here
     int compass_read = SensorHTCompass(IN_2); // assuming it returns an int
-    int error = compass_read - compass_calibrate;
+    int error = compass_read - calibrated_compass_value;
     if(error > 180)
     {
-    	error -= 360
+    	error -= 360;
     }
     if(error < -180)
     {
-    	error += 360
+    	error += 360;
     }
     return error;
 } // if error is negative, we have to move in the left direction, if error is positive
@@ -162,7 +162,7 @@ task sense_drive_and_write () {
 
          string rpm_val = rpm_msg();
 
-         int compass_read = aggregate_compass_sense();
+         int compass_read = error_detector(compass_calibrate);
 
          string compass_val = NumToStr(compass_read);
 
@@ -199,14 +199,14 @@ task calibrate_sensors() {
   until(ButtonPressed(BTNCENTER, true)) {Wait(10);}
 
   calibrated_distance = aggregate_ultrasonic_sense();
-  compass_calibrate = SensorHTCompass(IN_2);
+  compass_calibrate = error_detector(SensorHTCompass(IN_2));
   running_us_avg = calibrated_distance;
   ClearScreen();
   TextOut(0, LCD_LINE2, "Calibrated values:");
-  TextOut(0, LCD_LINE3, "Ultrasonic Sensor :"
+  TextOut(0, LCD_LINE3, "Ultrasonic Sensor :");
   NumOut(0, LCD_LINE4,calibrated_distance);
-  TextOut(0, LCD_LINE5, "Compass Sensor :"
-  NumOut(0, LCD_LINE6,compass_calibrate)
+  TextOut(0, LCD_LINE5, "Compass Sensor :");
+  NumOut(0, LCD_LINE6,compass_calibrate);
   TextOut(0, LCD_LINE7,"Press Center");
   TextOut(0, LCD_LINE8,"Button To Run");
 
@@ -219,6 +219,6 @@ task calibrate_sensors() {
 
 task main ()
 {
-  Precedes(calibrate_sensors(),running_us_avg_task());
+  Precedes(calibrate_sensors,running_us_avg_task);
 
 } // end of main

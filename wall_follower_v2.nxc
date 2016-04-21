@@ -1,3 +1,4 @@
+
 // File: Wall_follower.nxc
 // Date: 4/18/2016
 // Desc: Follow a wall
@@ -15,23 +16,28 @@ string text; // string to be written to file i.e. data values
 string write;
 int calibrated_distance;
 int running_us_avg = 20;
+long total_distance_cm;
 
 
 #define MOTOR OUT_B
 #define FULL_SPEED 100
 #define DEG_TO_RPM 166.6667 // converts degrees per millisecond to RPM
+#define CM_PER_ROTATION 17.5
 long prev_tick;
 long prev_deg = 0;
 long cur_tick;
 
-string rpm_msg()
+float distance_msg()
 {
    long dt = CurrentTick() - prev_tick;
    long deg = MotorRotationCount(MOTOR) - prev_deg;
    float rpm = deg * DEG_TO_RPM / dt;
    prev_deg = MotorRotationCount(MOTOR);
    prev_tick = CurrentTick();
-   return NumToStr(rpm);
+
+   float distance = rpm * CM_PER_ROTATION * dt/60000;
+
+   return distance;
 }
 
 // Create and initialize a file
@@ -53,7 +59,7 @@ void InitWriteToFile() {
       }
   // play a tone every time a file is created
   PlayTone(TONE_B7, 5);
-  fileHeader = "Orientation, RPM, Current Tick" ; // header for myData file
+  fileHeader = "Orientation, CM, Current Tick" ; // header for myData file
   WriteLnString(fileHandle, fileHeader, bytesWritten);
   // NXT Guide Section 6.59.2.43 pg. 554
   // Write string and new line to a file
@@ -94,14 +100,36 @@ void StopWriteToFile() {
 
 
 
-int aggregate_compass_sense () { //Figure out which sort of variable IN_2 is so we can ask for it here
+float aggregate_compass_sense () { //Figure out which sort of variable IN_2 is so we can ask for it here
     SetSensorLowspeed(IN_2);
-    int compass_read;
+    float compass_read;
     for (int x = 1; x <= 5; x++){
         compass_read += SensorHTCompass(IN_2);
     }
-    compass_read = compass_read/5;
+    compass_read = compass_read/6;
     return compass_read;
+
+    /*float compass_read;
+    float current_test;
+    float x, y = 0;
+
+    for (int x = 1; x <= 5; x++){
+        current_test += SensorHTCompass(IN_2);
+        current_test = current_test * PI / 180;
+        x += Cos(current_test);
+        y += Sin(current_test);
+        /*compass_read += current_test; /*
+        int error = current_test - test_value;
+        if (error > 180) {
+          error -= 180;
+        }
+        if (error < -180) {
+          error += 180;
+        }
+    }
+    compass_read = atan2(y, x);
+    compass_read = compass_read * 180 / PI;
+    return compass_read;*/
 }
 
 
@@ -131,7 +159,7 @@ task running_us_avg_task (){
   }
 
 
-task sense_drive_and_write () {
+task drive_and_write () {
      SetSensorLowspeed(IN_1);
      byte motors[] = {OUT_B,OUT_C};
      long initial_tick = CurrentTick();
@@ -141,20 +169,22 @@ task sense_drive_and_write () {
 
      while (us_val < calibrated_distance + 20) { //While loop to turn towards wall if it drifts away, and away from wall if it drifts close
 
-         if (us_val < calibrated_distance + 5)
+         if (us_val > calibrated_distance + 5)
          {
-          OnFwdSync(motors, 60, 2);
-         } else if (us_val > (calibrated_distance - 5))
+          OnFwdSync(motors, 60, 1);
+         } else if (us_val < (calibrated_distance - 5))
          {
-          OnFwdSync(motors, 60, -2);
+          OnFwdSync(motors, 60, -1);
          } else
          { OnFwd(motors, 60);}
 
          us_val = running_us_avg; //aggregate_ultrasonic_sense();
 
-         string rpm_val = rpm_msg();
+         total_distance_cm += distance_msg();
 
-         int compass_read = aggregate_compass_sense();
+         string distance_val = NumToStr(total_distance_cm);
+
+         float compass_read = aggregate_compass_sense();
 
          string compass_val = NumToStr(compass_read);
 
@@ -163,7 +193,7 @@ task sense_drive_and_write () {
          string tick_val = NumToStr(cur_tick);
          // Concatenate the 2 strings into a single one.
          // Write resulting string to file. The text will end with a EOL
-         text = StrCat(compass_val, "," , rpm_val, "," , tick_val, "," );
+         text = StrCat(compass_val, " degrees," , distance_val, "cm," , tick_val, "ticks," );
          WriteToFile(text);
          TextOut(0, LCD_LINE1, "US Reading:");
          ClearLine(LCD_LINE2);
@@ -201,7 +231,7 @@ task calibrate_ultrasonic_sensor() {
   until(ButtonPressed(BTNCENTER, true)) {Wait(10);}
 
   ClearScreen();
-  Precedes(sense_drive_and_write);
+  Precedes(drive_and_write);
 
 }
 
