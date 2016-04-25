@@ -36,7 +36,6 @@ float distance_msg() //returns the distance travelled, in cm, since the last tim
 
    float distance = rpm * CM_PER_ROTATION * dt/60000;
 
-   total_distance
    return distance;
 }
 
@@ -148,6 +147,21 @@ float aggregate_compass_sense () { //Figure out which sort of variable IN_2 is s
   void turn_right() {
     byte motors[] = {OUT_B,OUT_C};
     OnFwdSync(motors, 60, 50);
+    Wait(500);
+    Off(motors);
+    OnFwd(motors, 50);
+    Wait(2000);
+    Off(motors);
+  }
+
+  void turn_left() {
+    byte motors[] = {OUT_B,OUT_C};
+    OnFwdSync(motors, 60, -50);
+    Wait(500);
+    Off(motors);
+    OnFwd(motors, 50);
+    Wait(2000);
+    Off(motors);
   }
 
   task drive () {
@@ -158,7 +172,7 @@ float aggregate_compass_sense () { //Figure out which sort of variable IN_2 is s
     while (total_distance_cm < 1000) { //While loop to turn towards wall if it drifts away, and away from wall if it drifts close
 
         if (right_us_val < 50) {
-          if (front_us_val > 20) {
+          if (front_us_val > 40) {
             OnFwd(motors, 60);
             Wait(100);
           } else {
@@ -167,6 +181,8 @@ float aggregate_compass_sense () { //Figure out which sort of variable IN_2 is s
         } else {
           turn_right();
         }
+        right_us_val = running_right_us_avg;
+        front_us_val = running_front_us_avg;
       }
         Off(motors);
         StopWriteToFile();
@@ -181,6 +197,7 @@ float aggregate_compass_sense () { //Figure out which sort of variable IN_2 is s
 
        while (true) {
          int right_us_val = running_right_us_avg; //aggregate_ultrasonic_sense();
+         int front_us_val = running_front_us_avg;
 
           total_distance_cm += distance_msg();
 
@@ -197,15 +214,20 @@ float aggregate_compass_sense () { //Figure out which sort of variable IN_2 is s
            // Write resulting string to file. The text will end with a EOL
           text = StrCat(compass_val, " degrees," , distance_val, " cm," , tick_val, " ticks," );
           WriteToFile(text);
-          TextOut(0, LCD_LINE1, "US Reading:");
+          TextOut(0, LCD_LINE1, "US Readings:");
           ClearLine(LCD_LINE2);
           NumOut(0,LCD_LINE2, right_us_val);
+          NumOut(50, LCD_LINE2, front_us_val);
           TextOut(0,LCD_LINE3, "Compass Bearing:");
           ClearLine(LCD_LINE4);
           TextOut(0,LCD_LINE4, compass_val);
           TextOut(0,LCD_LINE5, "Ticks since start:");
           ClearLine(LCD_LINE6);
           TextOut(0,LCD_LINE6, tick_val);
+          ClearLine(LCD_LINE7);
+          TextOut(0,LCD_LINE7, "Total distance:");
+          ClearLine(LCD_LINE8);
+          NumOut(0,LCD_LINE8, total_distance_cm);
           Wait(2000);
        }
      }
@@ -234,4 +256,5 @@ float aggregate_compass_sense () { //Figure out which sort of variable IN_2 is s
      }
 
 task main ()
-  {    Precedes(calibrate_ultrasonic_sensor,running_right_us_avg_task,running_front_us_avg_task); }
+  {
+    Precedes(calibrate_ultrasonic_sensor,running_right_us_avg_task,running_front_us_avg_task); }
