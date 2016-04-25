@@ -1,6 +1,6 @@
 
 // File: Wall_follower.nxc
-// Date: 4/18/2016
+// Date: 4/24/2016
 // Desc: Follow a wall
 // Global variables (for file writing)
 
@@ -22,7 +22,7 @@ long total_distance_cm;
 #define MOTOR OUT_B
 #define FULL_SPEED 100
 #define DEG_TO_RPM 166.6667 // converts degrees per millisecond to RPM
-#define CM_PER_ROTATION 17.5
+#define CM_PER_ROTATION 16
 long prev_tick;
 long prev_deg = 0;
 long cur_tick;
@@ -158,59 +158,81 @@ task running_us_avg_task (){
     }
   }
 
+task drive () {
+  byte motors[] = {OUT_B,OUT_C};
+  int us_val = running_us_avg; //aggregate_ultrasonic_sense();
+
+  while (us_val < calibrated_distance + 20) { //While loop to turn towards wall if it drifts away, and away from wall if it drifts close
+
+      if (us_val > calibrated_distance + 2)
+      {
+       OnFwdSync(motors, 100, 1);
+      } else if (us_val < (calibrated_distance - 2))
+      {
+       OnFwdSync(motors, 100, -1);
+      } else
+      { OnFwd(motors, 100);}
+
+      us_val = running_us_avg;
+    }
+      Off(motors);
+      StopWriteToFile();
+      StopAllTasks();
+}
+
 
 task drive_and_write () {
      SetSensorLowspeed(IN_1);
-     byte motors[] = {OUT_B,OUT_C};
+     //byte motors[] = {OUT_B,OUT_C};
      long initial_tick = CurrentTick();
      InitWriteToFile();
 
-     int us_val = running_us_avg; //aggregate_ultrasonic_sense();
+     while (true) {
+       int us_val = running_us_avg; //aggregate_ultrasonic_sense();
 
-     while (us_val < calibrated_distance + 20) { //While loop to turn towards wall if it drifts away, and away from wall if it drifts close
+     /* while (us_val < calibrated_distance + 20) { //While loop to turn towards wall if it drifts away, and away from wall if it drifts close
 
-         if (us_val > calibrated_distance + 5)
+         if (us_val > calibrated_distance + 2)
          {
-          OnFwdSync(motors, 60, 1);
-         } else if (us_val < (calibrated_distance - 5))
+          OnFwdSync(motors, 60, 2);
+         } else if (us_val < (calibrated_distance - 2))
          {
-          OnFwdSync(motors, 60, -1);
+          OnFwdSync(motors, 60, -2);
          } else
          { OnFwd(motors, 60);}
 
-         us_val = running_us_avg; //aggregate_ultrasonic_sense();
+         us_val = running_us_avg; //aggregate_ultrasonic_sense(); */
 
-         total_distance_cm += distance_msg();
+        total_distance_cm += distance_msg();
 
-         string distance_val = NumToStr(total_distance_cm);
+        string distance_val = NumToStr(total_distance_cm);
 
-         float compass_read = aggregate_compass_sense();
+        float compass_read = aggregate_compass_sense();
 
-         string compass_val = NumToStr(compass_read);
+        string compass_val = NumToStr(compass_read);
 
-         cur_tick = CurrentTick() - initial_tick;
+        cur_tick = CurrentTick() - initial_tick;
 
-         string tick_val = NumToStr(cur_tick);
+        string tick_val = NumToStr(cur_tick);
          // Concatenate the 2 strings into a single one.
          // Write resulting string to file. The text will end with a EOL
-         text = StrCat(compass_val, " degrees," , distance_val, "cm," , tick_val, "ticks," );
-         WriteToFile(text);
-         TextOut(0, LCD_LINE1, "US Reading:");
-         ClearLine(LCD_LINE2);
-         NumOut(0,LCD_LINE2, us_val);
-         TextOut(0,LCD_LINE3, "Compass Bearing:");
-         ClearLine(LCD_LINE4);
-         TextOut(0,LCD_LINE4, compass_val);
-         TextOut(0,LCD_LINE5, "Ticks since start:");
-         ClearLine(LCD_LINE6);
-         TextOut(0,LCD_LINE6, tick_val);
-         Wait(2000);
+        text = StrCat(compass_val, " degrees," , distance_val, " cm," , tick_val, " ticks," );
+        WriteToFile(text);
+        TextOut(0, LCD_LINE1, "US Reading:");
+        ClearLine(LCD_LINE2);
+        NumOut(0,LCD_LINE2, us_val);
+        TextOut(0,LCD_LINE3, "Compass Bearing:");
+        ClearLine(LCD_LINE4);
+        TextOut(0,LCD_LINE4, compass_val);
+        TextOut(0,LCD_LINE5, "Ticks since start:");
+        ClearLine(LCD_LINE6);
+        TextOut(0,LCD_LINE6, tick_val);
+        Wait(2000);
      }
+   }
 
-     Off(motors);
-     StopWriteToFile();
-     StopAllTasks();
-}
+
+
 
 task calibrate_ultrasonic_sensor() {
   SetSensorLowspeed(IN_1);
@@ -231,7 +253,7 @@ task calibrate_ultrasonic_sensor() {
   until(ButtonPressed(BTNCENTER, true)) {Wait(10);}
 
   ClearScreen();
-  Precedes(drive_and_write);
+  Precedes(drive_and_write, drive);
 
 }
 
