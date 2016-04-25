@@ -146,35 +146,43 @@ float aggregate_compass_sense () { //Figure out which sort of variable IN_2 is s
 
   void turn_right() {
     byte motors[] = {OUT_B,OUT_C};
-    OnFwdSync(motors, 60, 50);
-    Wait(500);
+    OnFwdSync(motors, 60, 55);
+    Wait(485);
     Off(motors);
-    OnFwd(motors, 50);
-    Wait(2000);
-    Off(motors);
+    OnFwd(motors, 60);
+    Wait(1500);
+    //Off(motors);
+    //Wait(800);
+
   }
 
   void turn_left() {
     byte motors[] = {OUT_B,OUT_C};
-    OnFwdSync(motors, 60, -50);
-    Wait(500);
+    OnFwdSync(motors, 60, -55);
+    Wait(485);
     Off(motors);
-    OnFwd(motors, 50);
-    Wait(2000);
+    OnFwd(motors, 60);
+    Wait(750);
     Off(motors);
   }
+
 
   task drive () {
     byte motors[] = {OUT_B,OUT_C};
     int right_us_val = running_right_us_avg; //aggregate_ultrasonic_sense();
     int front_us_val = running_front_us_avg;
 
-    while (total_distance_cm < 1000) { //While loop to turn towards wall if it drifts away, and away from wall if it drifts close
+    while (total_distance_cm < 775) { //While loop to turn towards wall if it drifts away, and away from wall if it drifts close
 
-        if (right_us_val < 50) {
+      if (right_us_val < 50) {
           if (front_us_val > 40) {
-            OnFwd(motors, 60);
-            Wait(100);
+            if (right_us_val < (calibrated_distance)) //(right_us_val > calibrated_distance + 2)
+            {
+             OnFwdSync(motors, 60, -4);
+            } else {
+              OnFwdSync(motors, 60, 4);
+            }
+            //Wait(250);
           } else {
             turn_left();
           }
@@ -257,4 +265,5 @@ float aggregate_compass_sense () { //Figure out which sort of variable IN_2 is s
 
 task main ()
   {
-    Precedes(calibrate_ultrasonic_sensor,running_right_us_avg_task,running_front_us_avg_task); }
+    Precedes(calibrate_ultrasonic_sensor,running_right_us_avg_task,
+            running_front_us_avg_task); }
