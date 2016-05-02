@@ -9,7 +9,7 @@ string strFilePart; // file part e.g. myDataFile1-1, 1-2, 1-3
 string text; // string to be written to file i.e. data values
 string write;
 int calibrated_distance;
-int running_right_us_avg, running_front_us_avg = 20;
+int running_right_us_avg, running_front_us_avg;
 long total_distance_cm;
 long prev_tick;
 long prev_deg = 0;
@@ -97,12 +97,18 @@ void StopWriteToFile() {
 } // end StopWriteToFile
 
 float aggregate_compass_sense () { //Figure out which sort of variable IN_2 is so we can ask for it here
+    float a, b;
     SetSensorLowspeed(COMPASS);
-    float compass_read;
-    for (int x = 1; x <= 5; x++){
-        compass_read += SensorHTCompass(COMPASS);
+    float compass_read = SensorHTCompass(COMPASS);
+    a = compass_read;
+    b = SensorHTCompass(COMPASS);
+    if ((a - b) > 180) {
+      b += 360;
+    } else if ((b - a) > 180) {
+      a += 360;
     }
-    compass_read = compass_read/6;
+    compass_read = ((a + b) / 2) % 360;
+
     return compass_read;
   }
 
@@ -118,80 +124,103 @@ float aggregate_compass_sense () { //Figure out which sort of variable IN_2 is s
   }
 
 
-  task running_right_us_avg_task (){
+  task running_right_us_avg_task (){ // spits out the aggregation of 8 samples ~every 120 ms
     SetSensorLowspeed(RIGHT_US);
 
 
-    while (true) {
-      int avg;
-        for (int x = 1; x <=8; x++){
-          avg += SensorUS(RIGHT_US);
-        }
-        avg = avg/8;
+      while (true) {
+        int avg = 0;
+          for (int x = 1; x <= 4; x++){
+            avg += SensorUS(RIGHT_US);
+          }
+        avg = avg/4;
         running_right_us_avg = avg;
       }
-    }
+  }
 
     task running_front_us_avg_task (){
       SetSensorLowspeed(FRONT_US);
         while (true) {
-          int avg;
-          for (int x = 1; x <=8; x++){
+          int avg = 0;
+          for (int x = 1; x <= 4; x++){
             avg += SensorUS(FRONT_US);
             }
-          avg = avg/8;
+          avg = avg/4;
           running_front_us_avg = avg;
           }
         }
 
   void turn_right() {
     byte motors[] = {OUT_B,OUT_C};
-    OnFwdSync(motors, 60, 55);
-    Wait(485);
+    OnFwdSync(motors, 80, 35);
+    Wait(660);
     Off(motors);
-    OnFwd(motors, 60);
-    Wait(1500);
-    //Off(motors);
-    //Wait(800);
+    OnFwd(motors, 50);
+    Wait(200);
+    if (running_front_us_avg > 25) {
+      Wait(500);
+    }
+    /*if (running_front_us_avg > 20) {
+      Wait(300);
+    }*/
+    Off(motors);
+    Wait(750);
 
   }
 
   void turn_left() {
     byte motors[] = {OUT_B,OUT_C};
-    OnFwdSync(motors, 60, -55);
-    Wait(485);
+    OnFwdSync(motors, 60, -50);
+    Wait(500);
     Off(motors);
-    OnFwd(motors, 60);
+    OnFwd(motors, 50);
+    Wait(500);
+    Off(motors);
     Wait(750);
+  }
+
+  void back_it_up() {
+    byte motors[] = {OUT_B, OUT_C};
     Off(motors);
+    OnRevSync(motors, 60, -35);
+    Wait(500);
+    OnFwd(motors, 40);
+    Wait(300);
+    Off(motors);
+    Wait(400);
   }
 
 
   task drive () {
     byte motors[] = {OUT_B,OUT_C};
+    SetSensorTouch(BUMPER);
     int right_us_val = running_right_us_avg; //aggregate_ultrasonic_sense();
     int front_us_val = running_front_us_avg;
 
-    while (total_distance_cm < 775) { //While loop to turn towards wall if it drifts away, and away from wall if it drifts close
 
-      if (right_us_val < 50) {
-          if (front_us_val > 40) {
-            if (right_us_val < (calibrated_distance)) //(right_us_val > calibrated_distance + 2)
-            {
-             OnFwdSync(motors, 60, -4);
+    while (total_distance_cm < 720) { // While loop to turn towards wall if it drifts away,
+                                      // and away from wall if it drifts close
+      if (Sensor(BUMPER) == 0) {
+        if (front_us_val > 20) {
+          if (right_us_val < (calibrated_distance + 7)) {
+            if (right_us_val < (calibrated_distance)) { //(right_us_val > calibrated_distance + 2)
+                OnFwdSync(motors, 45, -1);
             } else {
-              OnFwdSync(motors, 60, 4);
+                OnFwdSync(motors, 45, 1);
+              }
+              //Wait(250);
+          } else { // if the front sensor has a reading greater than 30:
+            turn_right();//turn_left();
             }
-            //Wait(250);
-          } else {
-            turn_left();
+        } else { // if the right sensor has a reading greater than calibrated+10:
+          turn_left();//turn_right();
           }
-        } else {
-          turn_right();
+      } else { // if the bumper is  depressed
+        back_it_up();
         }
-        right_us_val = running_right_us_avg;
-        front_us_val = running_front_us_avg;
-      }
+      right_us_val = running_right_us_avg;
+      front_us_val = running_front_us_avg;
+    }
         Off(motors);
         StopWriteToFile();
         StopAllTasks();
@@ -202,6 +231,8 @@ float aggregate_compass_sense () { //Figure out which sort of variable IN_2 is s
        //byte motors[] = {OUT_B,OUT_C};
        long initial_tick = CurrentTick();
        InitWriteToFile();
+       SetSensorLowspeed(COMPASS);
+
 
        while (true) {
          int right_us_val = running_right_us_avg; //aggregate_ultrasonic_sense();
@@ -212,6 +243,8 @@ float aggregate_compass_sense () { //Figure out which sort of variable IN_2 is s
           string distance_val = NumToStr(total_distance_cm);
 
           float compass_read = aggregate_compass_sense();
+
+          float compass_non_aggregate = SensorHTCompass(COMPASS);
 
           string compass_val = NumToStr(compass_read);
 
@@ -229,6 +262,7 @@ float aggregate_compass_sense () { //Figure out which sort of variable IN_2 is s
           TextOut(0,LCD_LINE3, "Compass Bearing:");
           ClearLine(LCD_LINE4);
           TextOut(0,LCD_LINE4, compass_val);
+          NumOut(50,LCD_LINE4, compass_non_aggregate);
           TextOut(0,LCD_LINE5, "Ticks since start:");
           ClearLine(LCD_LINE6);
           TextOut(0,LCD_LINE6, tick_val);
