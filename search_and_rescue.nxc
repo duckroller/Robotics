@@ -171,6 +171,9 @@ float aggregate_compass_sense ()
     if (running_front_us_avg > 25) { // If there's room to go ahead, keep going
       Wait(700);
     }
+    if(total_distance_cm > 950){
+      Wait(450);
+    }
     Off(motors);
     Wait(750); // Pause for a bit to let the sensor-aggregation figure stuff out
   }
