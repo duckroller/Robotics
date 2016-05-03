@@ -169,7 +169,7 @@ float aggregate_compass_sense ()
     OnFwd(motors, 50); // Go forward to round the corner
     Wait(200); // Only scoot ahead for a bit before checking the front sensors
     if (running_front_us_avg > 25) { // If there's room to go ahead, keep going
-      Wait(600);
+      Wait(700);
     }
     Off(motors);
     Wait(750); // Pause for a bit to let the sensor-aggregation figure stuff out
@@ -194,7 +194,7 @@ float aggregate_compass_sense ()
   {
     byte motors[] = {OUT_B, OUT_C};
     Off(motors); // First: stop.
-    OnRevSync(motors, 60, -35); // Back up at an angle.
+    OnRevSync(motors, 60, -30); // Back up at an angle.
     Wait(500);
     OnFwd(motors, 40);  // Go forward, hopefully straighter relative to the wall
     Wait(300);
@@ -210,7 +210,7 @@ float aggregate_compass_sense ()
     int front_us_val = running_front_us_avg;
 
 
-    while (total_distance_cm < 1027) { // after progressing 1048 cm, stop
+    while (total_distance_cm < 990) { // after progressing 1039 cm, stop
 
       if (Sensor(BUMPER) == 0) { // bumper supercedes US_sensors
         if (front_us_val > 20) { // only think about going forward or right if there's nothing in front
